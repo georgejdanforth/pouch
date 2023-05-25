@@ -1,5 +1,6 @@
 package pouch
 
+import java.nio.file.{Files,Path}
 import scala.io.StdIn
 import scala.sys
 
@@ -14,6 +15,7 @@ object Main {
 
   case class Config(
     mode: String = "",
+    dataDir: Option[Path] = None,
   )
 
   val builder = OParser.builder[Config]
@@ -23,10 +25,72 @@ object Main {
       programName("pouch"),
       head("pouch", "0.0.0"),
       cmd(RunMode.Init)
-        .action((_, c) => c.copy(mode = RunMode.Init)),
+        .action((_, c) => c.copy(mode = RunMode.Init))
+        .children(
+          opt[Path]('D', "data-dir")
+            .required()
+            .action((path, c) => c.copy(dataDir = Some(path)))
+            .text("Data directory"),
+        ),
       cmd(RunMode.CLI)
         .action((_, c) => c.copy(mode = RunMode.CLI)),
     )
+  }
+
+  private def ensureDataDir(dataDir: Path): Unit = {
+    if (!Files.exists(dataDir)) {
+      try {
+        Files.createDirectory(dataDir)
+      } catch {
+        case e: Exception => {
+          println("Failed to create data directory: %s".format(e.getMessage()))
+          sys.exit(1)
+        }
+      }
+    } else if (!Files.isDirectory(dataDir)) {
+      println("Path exists and is not a directory: %s".format(dataDir.toString()))
+      sys.exit(1)
+    }
+    try {
+      if (Files.list(dataDir).count() > 0) {
+        println("Expected empty data directory: %s".format(dataDir.toString()))
+        sys.exit(1)
+      }
+    } catch {
+      case e: Exception => {
+        println("Failed to read data directory: %s".format(e.getMessage()))
+        sys.exit(1)
+      }
+    }
+  }
+
+  private def initDataFile(dataDir: Path): Unit = {
+    val filePath = dataDir.resolve("pouch.db")
+    if (Files.exists(filePath)) {
+      println("Data file already exists: %s".format(filePath.toString()))
+      sys.exit(1)
+    }
+    try {
+      Files.createFile(filePath)
+    } catch {
+      case e: Exception => {
+        println("Failed to create data file: %s".format(e.getMessage()))
+        sys.exit(1)
+      }
+    }
+  }
+
+  private def init(dataDir: Option[Path]): Unit = {
+    dataDir match {
+      case Some(dataDir) => {
+        ensureDataDir(dataDir)
+        initDataFile(dataDir)
+      }
+      case None => {
+        println("A valid filesystem path is required")
+        sys.exit(1)
+      }
+    }
   }
 
   private def cli(): Unit = {
@@ -48,7 +112,7 @@ object Main {
     OParser.parse(argParser, args, Config()) match {
       case Some(config) => {
         config.mode match {
-          case RunMode.Init => println("init")
+          case RunMode.Init => init(config.dataDir)
           case RunMode.CLI => cli()
           case _ => println(OParser.usage(argParser))
         }
