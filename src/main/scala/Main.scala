@@ -33,7 +33,13 @@ object Main {
             .text("Data directory"),
         ),
       cmd(RunMode.CLI)
-        .action((_, c) => c.copy(mode = RunMode.CLI)),
+        .action((_, c) => c.copy(mode = RunMode.CLI))
+        .children(
+          opt[Path]('D', "data-dir")
+            .required()
+            .action((path, c) => c.copy(dataDir = Some(path)))
+            .text("Data directory"),
+        ),
     )
   }
 
@@ -80,20 +86,18 @@ object Main {
     }
   }
 
-  private def init(dataDir: Option[Path]): Unit = {
-    dataDir match {
-      case Some(dataDir) => {
-        ensureDataDir(dataDir)
-        initDataFile(dataDir)
-      }
-      case None => {
-        println("A valid filesystem path is required")
-        sys.exit(1)
-      }
-    }
+  private def init(dataDir: Path): Unit = {
+    ensureDataDir(dataDir)
+    initDataFile(dataDir)
   }
 
-  private def cli(): Unit = {
+  private def cli(dataDir: Path): Unit = {
+    val filePath = dataDir.resolve("pouch.db")
+    if (!Files.isRegularFile(filePath)) {
+      println("Data dir is not initialized: %s".format(dataDir.toString()))
+      sys.exit(0)
+    }
+    val executor = new Executor(filePath)
     while (true) {
       print("> ")
       val input = scala.io.StdIn.readLine()
@@ -101,8 +105,14 @@ object Main {
       cmd match {
         case cmd : QuitCommand => return
         case cmd : GetCommand => println("GET %s".format(cmd.key))
-        case cmd : SetCommand => println("SET %s %s".format(cmd.key, cmd.value))
-        case cmd : DelCommand => println("DEL %s".format(cmd.key))
+        case cmd : SetCommand => {
+          executor.set(cmd.key, cmd.value)
+          println("SET %s %s".format(cmd.key, cmd.value))
+        }
+        case cmd : DelCommand => {
+          executor.delete(cmd.key)
+          println("DEL %s".format(cmd.key))
+        }
         case cmd : ErrCommand => println("Error: %s".format(cmd.message))
       }
     }
@@ -111,10 +121,15 @@ object Main {
   def main(args: Array[String]): Unit = {
     OParser.parse(argParser, args, Config()) match {
       case Some(config) => {
-        config.mode match {
-          case RunMode.Init => init(config.dataDir)
-          case RunMode.CLI => cli()
-          case _ => println(OParser.usage(argParser))
+        config.dataDir match {
+          case Some(dataDir) => {
+            config.mode match {
+              case RunMode.Init => init(config.dataDir.get)
+              case RunMode.CLI => cli(config.dataDir.get)
+              case _ => println(OParser.usage(argParser))
+            }
+          }
+          case None => println(OParser.usage(argParser))
         }
       }
       case _ => sys.exit(1)
