@@ -104,7 +104,12 @@ object Main {
       val cmd = Parser.parse(input)
       cmd match {
         case cmd : QuitCommand => return
-        case cmd : GetCommand => println("GET %s".format(cmd.key))
+        case cmd : GetCommand => {
+          executor.get(cmd.key) match {
+            case Some(value) => println(value)
+            case None => println("(nil)")
+          }
+        }
         case cmd : SetCommand => {
           executor.set(cmd.key, cmd.value)
           println("SET %s %s".format(cmd.key, cmd.value))

@@ -1,6 +1,9 @@
 package pouch
 
+import java.io.RandomAccessFile
 import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
+import java.nio.charset.StandardCharsets
 import java.nio.file.{Files,Path,StandardOpenOption}
 
 final object RecordType {
@@ -31,6 +34,41 @@ class Executor(dataFile: Path) {
     buffer.put(valBytes)
 
     return buffer.array()
+  }
+
+  def get(key: String): Option[String] = {
+    var value: Option[String] = None
+    val chan = new RandomAccessFile(dataFile.toString(), "r").getChannel
+
+    val sizeBuf = ByteBuffer.allocate(intBytes * 2)
+
+    while (chan.position < chan.size) {
+      chan.read(sizeBuf)
+      sizeBuf.flip()
+      val recordBytes = sizeBuf.getInt()
+      val keyBytes = sizeBuf.getInt()
+      val valBytes = recordBytes - 2 * intBytes - charBytes - keyBytes
+
+      val recordBuf = ByteBuffer.allocate(recordBytes - 2 * intBytes)
+      chan.read(recordBuf)
+      recordBuf.flip()
+
+      val recordType = recordBuf.getChar()
+      recordBuf.limit(charBytes + keyBytes)
+      val recordKey = StandardCharsets.UTF_8.decode(recordBuf).toString()
+
+      if (recordKey == key) {
+        if (recordType == RecordType.Tombstone) {
+          value = None
+        } else {
+          recordBuf.limit(recordBuf.capacity())
+          value = Some(StandardCharsets.UTF_8.decode(recordBuf).toString())
+        }
+      }
+
+      sizeBuf.clear()
+    }
+    return value
   }
 
   def set(key: String, value: String): Unit = {
