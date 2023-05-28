@@ -7,7 +7,28 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files,Path,StandardOpenOption}
 import java.util.Arrays
 
-class Executor(dataFile: Path) {
+class Executor() {
+  private final val memTable = new MemTable()
+
+  def get(key: Array[Byte]): Option[Array[Byte]] = {
+    memTable.get(key) match {
+      case Some(value) => Some(value.value)
+      case None => None
+    }
+  }
+
+  def set(key: Array[Byte], value: Array[Byte]): Unit = {
+    memTable.put(key, value)
+  }
+
+  def delete(key: Array[Byte]): Unit = {
+    memTable.delete(key)
+  }
+
+  // TODO: This is the original implementation making use of a single unsorted segment.
+  //  Currently, we're using a memtable only with no WAL. Use these methods to help
+  //  implement the new methods using SSTables + MemTable + WAL.
+  /*
   def get(key: Array[Byte]): Option[Array[Byte]] = {
     var value: Option[Array[Byte]] = None
     val chan = new RandomAccessFile(dataFile.toString(), "r").getChannel
@@ -54,4 +75,5 @@ class Executor(dataFile: Path) {
     val record = Encoder.encodeRecord(RecordType.Tombstone, key, None)
     Files.write(dataFile, record, StandardOpenOption.APPEND)
   }
+  */
 }
