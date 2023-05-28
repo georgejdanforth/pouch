@@ -92,6 +92,7 @@ object Main {
   }
 
   private def cli(dataDir: Path): Unit = {
+    val s = (a: Array[Byte]) => new String(a, "UTF-8")
     val filePath = dataDir.resolve("pouch.db")
     if (!Files.isRegularFile(filePath)) {
       println("Data dir is not initialized: %s".format(dataDir.toString()))
@@ -106,17 +107,17 @@ object Main {
         case cmd : QuitCommand => return
         case cmd : GetCommand => {
           executor.get(cmd.key) match {
-            case Some(value) => println(value)
+            case Some(value) => println(s(value))
             case None => println("(nil)")
           }
         }
         case cmd : SetCommand => {
           executor.set(cmd.key, cmd.value)
-          println("SET %s %s".format(cmd.key, cmd.value))
+          println("SET %s %s".format(s(cmd.key), s(cmd.value)))
         }
         case cmd : DelCommand => {
           executor.delete(cmd.key)
-          println("DEL %s".format(cmd.key))
+          println("DEL %s".format(s(cmd.key)))
         }
         case cmd : ErrCommand => println("Error: %s".format(cmd.message))
       }

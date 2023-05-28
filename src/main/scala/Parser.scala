@@ -6,14 +6,6 @@ object ParseErrType extends Enumeration {
   val UnparseableInput, UnrecognizedCommand, InvalidArgs = Value
 }
 
-sealed trait Command
-
-final case class QuitCommand() extends Command
-final case class GetCommand(key: String) extends Command
-final case class SetCommand(key: String, value: String) extends Command
-final case class DelCommand(key: String) extends Command
-final case class ErrCommand(errType: ParseErrType.ParseErrType, message: String) extends Command
-
 object Tokens {
   val Q = "q"
   val Quit = "quit"
@@ -71,7 +63,7 @@ object Parser {
             "GET expects a single `key` argument. Got %d arguments".format(tokens.length - 1)
           )
         }
-        return GetCommand(tokens(1).value)
+        return GetCommand(tokens(1).value.getBytes)
       }
       case TokenType.Set => {
         if (tokens.length != 3) {
@@ -80,7 +72,7 @@ object Parser {
             "SET expects a `key` and a `value` argument. Got %d arguments".format(tokens.length - 1)
           )
         }
-        return SetCommand(tokens(1).value, tokens(2).value)
+        return SetCommand(tokens(1).value.getBytes, tokens(2).value.getBytes)
       }
       case TokenType.Del => {
         if (tokens.length != 2) {
@@ -89,7 +81,7 @@ object Parser {
             "DEL expects a single `key` argument. Got %d arguments".format(tokens.length - 1)
           )
         }
-        return DelCommand(tokens(1).value)
+        return DelCommand(tokens(1).value.getBytes)
       }
     }
   }

@@ -1,5 +1,6 @@
 package pouch
 
+import java.util.Arrays
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.PrivateMethodTester
 
@@ -91,7 +92,7 @@ class ParserTests extends AnyFunSuite with PrivateMethodTester {
       case (t, expected) => {
         val result = Parser.parse(t)
         assert(result.isInstanceOf[GetCommand])
-        assert(result.asInstanceOf[GetCommand].key == expected)
+        assert(Arrays.equals(result.asInstanceOf[GetCommand].key, expected.getBytes))
       }
     }
   }
@@ -115,8 +116,8 @@ class ParserTests extends AnyFunSuite with PrivateMethodTester {
       case (t, expectedKey, expectedValue) => {
         val result = Parser.parse(t)
         assert(result.isInstanceOf[SetCommand])
-        assert(result.asInstanceOf[SetCommand].key == expectedKey)
-        assert(result.asInstanceOf[SetCommand].value == expectedValue)
+        assert(Arrays.equals(result.asInstanceOf[SetCommand].key, expectedKey.getBytes))
+        assert(Arrays.equals(result.asInstanceOf[SetCommand].value, expectedValue.getBytes))
       }
     }
   }
@@ -140,7 +141,7 @@ class ParserTests extends AnyFunSuite with PrivateMethodTester {
       case (t, expected) => {
         val result = Parser.parse(t)
         assert(result.isInstanceOf[DelCommand])
-        assert(result.asInstanceOf[DelCommand].key == expected)
+        assert(Arrays.equals(result.asInstanceOf[DelCommand].key, expected.getBytes))
       }
     }
   }

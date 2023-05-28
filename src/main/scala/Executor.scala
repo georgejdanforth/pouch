@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files,Path,StandardOpenOption}
+import java.util.Arrays
 
 final object RecordType {
   val Data = 'D'
@@ -20,24 +21,21 @@ class Executor(dataFile: Path) {
     print("\n --- \n")
   }
 
-  private def encode(recordType: Char, key: String, value: String): Array[Byte] = {
-    val keyBytes = key.getBytes()
-    val valBytes = value.getBytes()
-
-    val bufSize = 2 * intBytes + charBytes + keyBytes.length + valBytes.length
+  private def encode(recordType: Char, key: Array[Byte], value: Array[Byte]): Array[Byte] = {
+    val bufSize = 2 * intBytes + charBytes + key.length + value.length
     val buffer = ByteBuffer.allocate(bufSize)
 
     buffer.putInt(bufSize)
-    buffer.putInt(keyBytes.length)
+    buffer.putInt(key.length)
     buffer.putChar(recordType)
-    buffer.put(keyBytes)
-    buffer.put(valBytes)
+    buffer.put(key)
+    buffer.put(value)
 
     return buffer.array()
   }
 
-  def get(key: String): Option[String] = {
-    var value: Option[String] = None
+  def get(key: Array[Byte]): Option[Array[Byte]] = {
+    var value: Option[Array[Byte]] = None
     val chan = new RandomAccessFile(dataFile.toString(), "r").getChannel
 
     val sizeBuf = ByteBuffer.allocate(intBytes * 2)
@@ -55,14 +53,16 @@ class Executor(dataFile: Path) {
 
       val recordType = recordBuf.getChar()
       recordBuf.limit(charBytes + keyBytes)
-      val recordKey = StandardCharsets.UTF_8.decode(recordBuf).toString()
+      val recordKey = Array.ofDim[Byte](keyBytes)
+      recordBuf.get(recordKey)
 
-      if (recordKey == key) {
+      if (Arrays.equals(recordKey, key)) {
         if (recordType == RecordType.Tombstone) {
           value = None
         } else {
-          recordBuf.limit(recordBuf.capacity())
-          value = Some(StandardCharsets.UTF_8.decode(recordBuf).toString())
+          recordBuf.limit(recordBuf.capacity)
+          value = Some(Array.ofDim[Byte](valBytes))
+          recordBuf.get(value.get)
         }
       }
 
@@ -71,13 +71,13 @@ class Executor(dataFile: Path) {
     return value
   }
 
-  def set(key: String, value: String): Unit = {
+  def set(key: Array[Byte], value: Array[Byte]): Unit = {
     val record = encode(RecordType.Data, key, value)
     Files.write(dataFile, record, StandardOpenOption.APPEND)
   }
 
-  def delete(key: String): Unit = {
-    val record = encode(RecordType.Tombstone, key, "")
+  def delete(key: Array[Byte]): Unit = {
+    val record = encode(RecordType.Tombstone, key, Array[Byte]())
     Files.write(dataFile, record, StandardOpenOption.APPEND)
   }
 }
