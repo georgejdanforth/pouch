@@ -7,7 +7,10 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.{Files,Path,StandardOpenOption}
 import java.util.Arrays
 
-class Executor() {
+class Executor(baseDataDir: Path, walService: WALService) {
+  private final val walDir = baseDataDir.resolve("wal")
+  private final val dataDir = baseDataDir.resolve("data")
+
   private final val memTable = new MemTable()
 
   def get(key: Array[Byte]): Option[Array[Byte]] = {
@@ -23,6 +26,10 @@ class Executor() {
 
   def delete(key: Array[Byte]): Unit = {
     memTable.delete(key)
+  }
+
+  def recover(): Unit = {
+    // TODO: recover from current WAL segment
   }
 
   // TODO: This is the original implementation making use of a single unsorted segment.

@@ -1,6 +1,7 @@
 package pouch
 
-import java.nio.file.{Files,Path}
+import java.io.File
+import java.nio.file.{Files,Path,Paths}
 import scala.io.StdIn
 import scala.sys
 
@@ -43,6 +44,10 @@ object Main {
     )
   }
 
+  private def listDir(dir: Path): Array[Path] = {
+    (new File(dir.toString)).list.map(s => Paths.get(s)).toArray
+  }
+
   private def init(baseDataDir: Path): Unit = {
     val walDir = baseDataDir.resolve("wal")
     val dataDir = baseDataDir.resolve("data")
@@ -64,7 +69,7 @@ object Main {
 
     // Ensure base data directory is empty
     try {
-      if (Files.list(baseDataDir).count() > 0) {
+      if (listDir(baseDataDir).length > 0) {
         println("Expected empty data directory: %s".format(baseDataDir.toString()))
         sys.exit(1)
       }
@@ -124,13 +129,66 @@ object Main {
     }
   }
 
+  private def initExecutor(baseDataDir: Path): Executor = {
+    val walDir = baseDataDir.resolve("wal")
+    val dataDir = baseDataDir.resolve("data")
+
+    val maxWalSegmentNumber = listDir(walDir)
+      .map(path => Utils.segmentNumberToInt(path.getFileName.toString))
+      .max
+
+    var maxDataSegmentNumber = -1
+    val dataDirContents = listDir(dataDir)
+    if (dataDirContents.length > 0) {
+      maxDataSegmentNumber = dataDirContents
+        .map(path => Utils.segmentNumberToInt(path.getFileName.toString))
+        .max
+    }
+
+    val (walSegmentNumber, needRecovery) = {
+      // This is will be the typical case. The memtable was not flushed before shutdown
+      // therefore the current WAL segment is ahead of the most recent data segment.
+      // In this case we will need to recover from WAL.
+      if (maxWalSegmentNumber > maxDataSegmentNumber) {
+        (maxWalSegmentNumber, true)
+      }
+
+      // Otherwise, the segment number is going to be the number following the max
+      // of the latest WAL segment number and the latest data segment number.
+      // TODO: if the latest WAL segment number is behind the latest data segment number
+      // we should log a warning but still allow startup.
+      val nextSegmentNumber = Math.max(maxWalSegmentNumber, maxDataSegmentNumber) + 1
+
+      try {
+        val walFilePath = walDir.resolve(Utils.intToSegmentNumber(nextSegmentNumber + 1))
+        Files.createFile(walFilePath)
+      } catch {
+        case e: Exception => {
+          println("Failed to create WAL segment: %s".format(e.getMessage()))
+          sys.exit(1)
+        }
+      }
+
+      (nextSegmentNumber, false)
+    }
+
+    val walService = new WALService(walDir, walSegmentNumber)
+    val executor = new Executor(baseDataDir, walService)
+
+    if (needRecovery) {
+    }
+
+    return executor
+  }
+
   private def cli(baseDataDir: Path): Unit = {
     // Helper function to convert a byte array to a utf-8 encoded string
     val s = (a: Array[Byte]) => new String(a, "UTF-8")
 
     validateDataDir(baseDataDir)
 
-    val executor = new Executor()
+    val executor = initExecutor(baseDataDir)
+
     while (true) {
       print("> ")
       val input = scala.io.StdIn.readLine()
