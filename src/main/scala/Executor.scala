@@ -6,6 +6,7 @@ import java.nio.channels.FileChannel
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files,Path,StandardOpenOption}
 import java.util.Arrays
+// import scala.util.Using
 
 class Executor(baseDataDir: Path, walService: WALService) {
   private final val walDir = baseDataDir.resolve("wal")
@@ -21,15 +22,25 @@ class Executor(baseDataDir: Path, walService: WALService) {
   }
 
   def set(key: Array[Byte], value: Array[Byte]): Unit = {
+    walService.append(RecordType.Data, key, Some(value))
     memTable.put(key, value)
   }
 
   def delete(key: Array[Byte]): Unit = {
+    walService.append(RecordType.Tombstone, key, None)
     memTable.delete(key)
   }
 
   def recover(): Unit = {
-    // TODO: recover from current WAL segment
+    // TODO: figure out how to make this work with scala.util.Using
+    val segment = walService.getSegment()
+    segment.foreach { record =>
+      record.recordType match {
+        case RecordType.Data => memTable.put(record.key, record.value.get)
+        case RecordType.Tombstone => memTable.delete(record.key)
+      }
+    }
+    segment.close()
   }
 
   // TODO: This is the original implementation making use of a single unsorted segment.

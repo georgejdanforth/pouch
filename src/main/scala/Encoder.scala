@@ -41,7 +41,11 @@ object Encoder {
     return buffer.array()
   }
 
-  def encodeRecord(record: Record): Array[Byte] = encodeRecord(record.recordType, record.key, record.value)
+  def encodeRecord(record: Record): Array[Byte] = encodeRecord(
+    record.recordType,
+    record.key,
+    record.value
+  )
 
   def decodeRecord(buffer: ByteBuffer): Record = {
     val recordSize = buffer.getInt
