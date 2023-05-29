@@ -28,6 +28,8 @@ version := "1.0"
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.1.1"
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.16" % Test
 libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0"
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.10"
+libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.9.4"
 
 // Here, `libraryDependencies` is a set of dependencies, and by using `+=`,
 // we're adding the scala-parser-combinators dependency to the set of dependencies

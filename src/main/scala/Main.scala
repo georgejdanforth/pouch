@@ -6,8 +6,9 @@ import scala.io.StdIn
 import scala.sys
 
 import scopt.OParser
+import com.typesafe.scalalogging.StrictLogging
 
-object Main {
+object Main extends StrictLogging {
 
   object RunMode {
     final val Init = "init"
@@ -151,31 +152,35 @@ object Main {
       // In this case we will need to recover from WAL.
       if (maxWalSegmentNumber > maxDataSegmentNumber) {
         (maxWalSegmentNumber, true)
-      }
+      } else {
+        // Otherwise, the segment number is going to be the number following the max
+        // of the latest WAL segment number and the latest data segment number.
+        val nextSegmentNumber = Math.max(maxWalSegmentNumber, maxDataSegmentNumber) + 1
 
-      // Otherwise, the segment number is going to be the number following the max
-      // of the latest WAL segment number and the latest data segment number.
-      // TODO: if the latest WAL segment number is behind the latest data segment number
-      // we should log a warning but still allow startup.
-      val nextSegmentNumber = Math.max(maxWalSegmentNumber, maxDataSegmentNumber) + 1
-
-      try {
-        val walFilePath = walDir.resolve(Utils.intToSegmentNumber(nextSegmentNumber + 1))
-        Files.createFile(walFilePath)
-      } catch {
-        case e: Exception => {
-          println("Failed to create WAL segment: %s".format(e.getMessage()))
-          sys.exit(1)
+        if (maxDataSegmentNumber > maxWalSegmentNumber) {
+          logger.warn("Latest WAL segment is lagging latest data segment")
         }
-      }
 
-      (nextSegmentNumber, false)
+        try {
+          val walFilePath = walDir.resolve(Utils.intToSegmentNumber(nextSegmentNumber + 1))
+          Files.createFile(walFilePath)
+        } catch {
+          case e: Exception => {
+            println("Failed to create WAL segment: %s".format(e.getMessage()))
+            sys.exit(1)
+          }
+        }
+
+        (nextSegmentNumber, false)
+      }
     }
 
     val walService = new WALService(walDir, walSegmentNumber)
     val executor = new Executor(baseDataDir, walService)
 
     if (needRecovery) {
+      logger.info("Recoving from latest WAL segment")
+      executor.recover()
     }
 
     return executor
