@@ -19,6 +19,7 @@ class Segment(path: Path) extends Iterable[Record] with AutoCloseable {
           throw new NoSuchElementException("No more records in segment")
         }
         chan.read(sizeBuffer)
+        sizeBuffer.flip()
         chan.position(chan.position - java.lang.Integer.BYTES)
 
         val recordSize = sizeBuffer.getInt()
@@ -26,6 +27,7 @@ class Segment(path: Path) extends Iterable[Record] with AutoCloseable {
 
         val recordBuffer = ByteBuffer.allocate(recordSize)
         chan.read(recordBuffer)
+        recordBuffer.flip()
 
         return Encoder.decodeRecord(recordBuffer)
       }

@@ -42,20 +42,20 @@ class SegmentTests extends AnyFunSuite with BeforeAndAfterEach with BeforeAndAft
       Record(RecordType.Tombstone, b("wat"), None),
     )
     composeSegment(records)
-    Using(new Segment(segmentFilePath)) { segment =>
-      segment.zip(records).foreach {
-        case (segRec, arrRec) => {
-          assert(segRec.recordType == arrRec.recordType)
-          assert(Arrays.equals(segRec.key, arrRec.key))
-          segRec.recordType match {
-            case RecordType.Data => assert(Arrays.equals(segRec.value.get, arrRec.value.get))
-            case RecordType.Tombstone => {
-              assert(segRec.value == arrRec.value)
-              assert(segRec.value == None)
-            }
+    val segment = new Segment(segmentFilePath)
+    segment.zip(records).foreach {
+      case (segRec, arrRec) => {
+        assert(segRec.recordType == arrRec.recordType)
+        assert(Arrays.equals(segRec.key, arrRec.key))
+        segRec.recordType match {
+          case RecordType.Data => assert(Arrays.equals(segRec.value.get, arrRec.value.get))
+          case RecordType.Tombstone => {
+            assert(segRec.value == arrRec.value)
+            assert(segRec.value == None)
           }
         }
       }
     }
+    segment.close()
   }
 }
