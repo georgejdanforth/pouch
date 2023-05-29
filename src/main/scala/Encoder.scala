@@ -7,6 +7,8 @@ final object RecordType {
   val Tombstone = 'T'
 }
 
+final case class Record(recordType: Char, key: Array[Byte], value: Option[Array[Byte]])
+
 object Encoder {
   private final val baseRecordSize = 2 * java.lang.Integer.BYTES + java.lang.Character.BYTES
 
@@ -16,6 +18,8 @@ object Encoder {
       case None => baseRecordSize + key.length
     }
   }
+
+  def getRecordSize(record: Record): Int = getRecordSize(record.key, record.value)
 
   def encodeRecord(
     recordType: Char,
@@ -35,5 +39,27 @@ object Encoder {
     }
 
     return buffer.array()
+  }
+
+  def encodeRecord(record: Record): Array[Byte] = encodeRecord(record.recordType, record.key, record.value)
+
+  def decodeRecord(buffer: ByteBuffer): Record = {
+    val recordSize = buffer.getInt
+    val keySize = buffer.getInt
+    val recordType = buffer.getChar
+    val key = Array.ofDim[Byte](keySize)
+    buffer.get(key)
+
+    recordType match {
+      case RecordType.Data => {
+        val valueSize = recordSize - baseRecordSize - keySize
+        val value = Array.ofDim[Byte](valueSize)
+        buffer.get(value)
+        return Record(recordType, key, Some(value))
+      }
+      case RecordType.Tombstone => {
+        return Record(recordType, key, None)
+      }
+    }
   }
 }
